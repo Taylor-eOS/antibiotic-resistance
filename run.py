@@ -6,15 +6,15 @@ HEIGHT = 500
 GRID_WIDTH = 50
 GRID_HEIGHT = 50
 CELL_SIZE = WIDTH // GRID_WIDTH
-MAX_DENSITY = 5
+MAX_DENSITY = 1
 MUTATION_STD = 0.1
-BASE_REPRO_PROB = 0.2
-BASE_DEATH_RATE = 0.01
+BASE_REPRO_PROB = 0.5
+BASE_DEATH_RATE = 0.05
 
 def reproduce_vector(vector):
     i = random.randrange(3)
     mutated = vector[:]
-    mutated[i] = min(255, max(0, mutated[i] + random.gauss(0, 7)))
+    mutated[i] = min(255, max(0, mutated[i] + random.gauss(0, 2)))
     return mutated
 
 class Environment:
@@ -34,9 +34,9 @@ class Environment:
 
     def compute_fitness(self, vector, x, y):
         r, g, b = vector
-        target = (255, 0, 0)
-        distance = abs(r - target[0]) + abs(g - target[1]) + abs(b - target[2])
-        influence = max(0, 1 - distance / 765)
+        targets = [(255, 0, 0), (0, 255, 0)]
+        distances = [abs(r - tr) + abs(g - tg) + abs(b - tb) for tr, tg, tb in targets]
+        influence = max(0, 1 - min(distances) / 765)
         return min(1, BASE_REPRO_PROB + 0.3 * influence)
 
     def random_adjacent(self, x, y):
@@ -65,10 +65,10 @@ class Environment:
         for x, y in list(self.active_cells):
             cell = self.grid[y][x]
             for vector in list(cell):
-                if self.density(x, y) < self.max_density:
+                nx, ny = self.random_adjacent(x, y)
+                if self.density(nx, ny) < self.max_density:
                     if random.random() < self.compute_fitness(vector, x, y):
                         child = reproduce_vector(vector)
-                        nx, ny = self.random_adjacent(x, y)
                         offspring.append((nx, ny, child))
         return offspring
 
@@ -127,6 +127,6 @@ if __name__ == '__main__':
                 py = y * CELL_SIZE + CELL_SIZE // 2
                 pygame.draw.circle(screen, (r, g, b), (px, py), CELL_SIZE // 3)
         pygame.display.flip()
-        clock.tick(100)
+        clock.tick(250)
     pygame.quit()
 
