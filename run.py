@@ -1,7 +1,7 @@
 import pygame
 import random
 from environment import Environment
-from settings import SIDE, WIDTH, HEIGHT, GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, MAX_DENSITY, SPEED
+from settings import SIDE, WIDTH, HEIGHT, GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, MAX_DENSITY, SPEED, SPAWNS
 
 def init_pygame():
     pygame.init()
@@ -12,7 +12,7 @@ def init_pygame():
 
 def setup_environment():
     env = Environment(GRID_WIDTH, GRID_HEIGHT, MAX_DENSITY)
-    for _ in range(100):
+    for _ in range(SPAWNS):
         x = random.randrange(GRID_WIDTH)
         y = random.randrange(GRID_HEIGHT)
         vector = [random.uniform(0, 255) for _ in range(3)]

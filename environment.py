@@ -1,5 +1,5 @@
 import random
-from settings import BASE_REPRO_PROB, BASE_DEATH_RATE
+from settings import BASE_REPRO_PROB, BASE_DEATH_RATE, CROWDING_PENALTY, MISMATCH_PENALTY
 
 class Environment:
     def __init__(self, w, h, max_density):
@@ -11,13 +11,6 @@ class Environment:
         self.targets = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255), (255, 0, 255), (255, 255, 0)]
         segment_count = len(self.targets)
         self.segment = [[x * segment_count // w for x in range(w)] for _ in range(h)]
-
-    def compute_fitness(self, vector, x, y):
-        r, g, b = vector
-        tr, tg, tb = self.targets[self.segment[y][x]]
-        distance = abs(r - tr) + abs(g - tg) + abs(b - tb)
-        influence = max(0, 1 - distance / 765)
-        return min(1, BASE_REPRO_PROB + 0.3 * influence)
 
     @staticmethod
     def reproduce_vector(vector):
@@ -42,36 +35,22 @@ class Environment:
                     neighbors.append((nx, ny))
         return random.choice(neighbors)
 
-    def reproduce(self):
-        offspring = []
-        for x, y in list(self.active_cells):
-            for vector in list(self.grid[y][x]):
-                nx, ny = self.random_adjacent(x, y)
-                prob = self.reproduction_probability(vector, x, y, nx, ny)
-                if random.random() < prob:
-                    child = self.reproduce_vector(vector)
-                    offspring.append((nx, ny, child))
-        return offspring
-
-    def reproduction_probability(self, vector, x, y, nx, ny):
-        base = self.compute_fitness(vector, x, y)
-        ratio = self.density(nx, ny) / self.max_density
-        if ratio >= 1:
-            return 0
-        return base * (1 - ratio) ** 0.5
-
-    def place_offspring(self, offspring):
-        for x, y, child in offspring:
-            cell = self.grid[y][x]
-            if len(cell) < self.max_density:
-                cell.append(child)
-                self.active_cells.add((x, y))
+    def death_probability(self, vector, x, y):
+        r, g, b = vector
+        tr, tg, tb = self.targets[self.segment[y][x]]
+        distance = abs(r - tr) + abs(g - tg) + abs(b - tb)
+        influence = max(0, 1 - distance / 765)
+        mismatch = 1 - influence
+        density = len(self.grid[y][x]) / self.max_density
+        density_factor = density**0.5 if density < 1 else 1
+        adjusted_density_penalty = CROWDING_PENALTY * density_factor
+        return min(1, BASE_DEATH_RATE + MISMATCH_PENALTY * mismatch + adjusted_density_penalty)
 
     def mortality(self):
         to_remove = []
         for x, y in list(self.active_cells):
             cell = self.grid[y][x]
-            survivors = [v for v in cell if random.random() > BASE_DEATH_RATE]
+            survivors = [v for v in cell if random.random() > self.death_probability(v, x, y)]
             if not survivors and cell:
                 survivors = [random.choice(cell)]
             self.grid[y][x] = survivors
@@ -79,6 +58,25 @@ class Environment:
                 to_remove.append((x, y))
         for coord in to_remove:
             self.active_cells.remove(coord)
+
+    def reproduce(self):
+        offspring = []
+        for x, y in list(self.active_cells):
+            for vector in list(self.grid[y][x]):
+                nx, ny = self.random_adjacent(x, y)
+                density = len(self.grid[ny][nx]) / self.max_density
+                prob = max(0, (1 - density)**2)
+                if random.random() < prob:
+                    child = self.reproduce_vector(vector)
+                    offspring.append((nx, ny, child))
+        return offspring
+
+    def place_offspring(self, offspring):
+        for x, y, child in offspring:
+            cell = self.grid[y][x]
+            if len(cell) < self.max_density:
+                cell.append(child)
+                self.active_cells.add((x, y))
 
     def step(self):
         self.mortality()
