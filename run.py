@@ -1,15 +1,15 @@
 import pygame
 import random
 
-WIDTH = 500
-HEIGHT = 500
-GRID_WIDTH = 50
-GRID_HEIGHT = 50
+WIDTH = 900
+HEIGHT = 600
+GRID_WIDTH = 90
+GRID_HEIGHT = 60
 CELL_SIZE = WIDTH // GRID_WIDTH
 MAX_DENSITY = 1
 MUTATION_STD = 0.1
 BASE_REPRO_PROB = 0.5
-BASE_DEATH_RATE = 0.05
+BASE_DEATH_RATE = 0.1
 
 def reproduce_vector(vector):
     i = random.randrange(3)
@@ -34,7 +34,7 @@ class Environment:
 
     def compute_fitness(self, vector, x, y):
         r, g, b = vector
-        targets = [(255, 0, 0), (0, 255, 0)]
+        targets = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255), (255, 0, 255), (255, 255, 0)]
         distances = [abs(r - tr) + abs(g - tg) + abs(b - tb) for tr, tg, tb in targets]
         influence = max(0, 1 - min(distances) / 765)
         return min(1, BASE_REPRO_PROB + 0.3 * influence)
@@ -111,11 +111,16 @@ if __name__ == '__main__':
         vector = [random.uniform(0, 255) for _ in range(3)]
         env.add(x, y, vector)
     running = True
+    paused = False
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-        env.step()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    paused = not paused
+        if not paused:
+            env.step()
         screen.fill((0,0,0))
         for x, y in env.active_cells:
             for vector in env.grid[y][x]:
@@ -127,6 +132,5 @@ if __name__ == '__main__':
                 py = y * CELL_SIZE + CELL_SIZE // 2
                 pygame.draw.circle(screen, (r, g, b), (px, py), CELL_SIZE // 3)
         pygame.display.flip()
-        clock.tick(250)
-    pygame.quit()
+        clock.tick(200)
 
