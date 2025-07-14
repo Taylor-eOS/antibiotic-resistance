@@ -53,26 +53,16 @@ class Environment:
                     neighbors.append((nx, ny))
         return random.choice(neighbors)
 
-    def cull(self):
-        to_remove = []
-        for x,y in list(self.active_cells):
-            cell = self.grid[y][x]
-            if len(cell) > self.max_density:
-                random.shuffle(cell)
-                self.grid[y][x] = cell[:self.max_density]
-            if not self.grid[y][x]:
-                to_remove.append((x, y))
-        for coord in to_remove:
-            self.active_cells.remove(coord)
-
     def reproduce(self):
         offspring = []
         for x, y in list(self.active_cells):
-            cell = self.grid[y][x]
-            for vector in list(cell):
+            for vector in list(self.grid[y][x]):
                 nx, ny = self.random_adjacent(x, y)
-                if self.density(nx, ny) < self.max_density:
-                    if random.random() < self.compute_fitness(vector, x, y):
+                d = self.density(nx, ny)
+                ratio = d / self.max_density
+                if ratio < 1:
+                    density_factor = (1 - ratio) ** 0.5
+                    if random.random() < self.compute_fitness(vector, x, y) * density_factor:
                         child = reproduce_vector(vector)
                         offspring.append((nx, ny, child))
         return offspring
@@ -103,7 +93,6 @@ class Environment:
         self.mortality()
         offspring = self.reproduce()
         self.place_offspring(offspring)
-        self.cull()
 
 if __name__ == '__main__':
     pygame.init()
