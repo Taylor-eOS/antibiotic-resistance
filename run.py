@@ -1,130 +1,75 @@
 import pygame
 import random
+from environment import Environment
+from settings import SIDE, WIDTH, HEIGHT, GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, MAX_DENSITY, SPEED
 
-WIDTH = 900
-HEIGHT = 600
-GRID_WIDTH = 90
-GRID_HEIGHT = 60
-CELL_SIZE = WIDTH // GRID_WIDTH
-MAX_DENSITY = 1
-MUTATION_STD = 0.1
-BASE_REPRO_PROB = 0.5
-BASE_DEATH_RATE = 0.1
-
-def reproduce_vector(vector):
-    i = random.randrange(3)
-    mutated = vector[:]
-    mutated[i] = min(255, max(0, mutated[i] + random.gauss(0, 2)))
-    return mutated
-
-class Environment:
-    def __init__(self, w, h, max_density):
-        self.w = w
-        self.h = h
-        self.max_density = max_density
-        self.grid = [[[] for _ in range(w)] for _ in range(h)]
-        self.active_cells = set()
-        self.targets = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255), (255, 0, 255), (255, 255, 0)]
-        segment_count = len(self.targets)
-        self.segment = [
-            [x * segment_count // w for x in range(w)]
-            for _ in range(h)]
-
-    def compute_fitness(self, vector, x, y):
-        r, g, b = vector
-        tr, tg, tb = self.targets[self.segment[y][x]]
-        distance = abs(r - tr) + abs(g - tg) + abs(b - tb)
-        influence = max(0, 1 - distance / 765)
-        return min(1, BASE_REPRO_PROB + 0.3 * influence)
-
-    def add(self, x, y, vector):
-        self.grid[y][x].append(vector)
-        self.active_cells.add((x, y))
-
-    def density(self, x, y):
-        return len(self.grid[y][x])
-
-    def random_adjacent(self, x, y):
-        neighbors = []
-        for dx in -1,0,1:
-            for dy in -1,0,1:
-                nx, ny = x+dx, y+dy
-                if 0 <= nx < self.w and 0 <= ny < self.h:
-                    neighbors.append((nx, ny))
-        return random.choice(neighbors)
-
-    def reproduce(self):
-        offspring = []
-        for x, y in list(self.active_cells):
-            for vector in list(self.grid[y][x]):
-                nx, ny = self.random_adjacent(x, y)
-                d = self.density(nx, ny)
-                ratio = d / self.max_density
-                if ratio < 1:
-                    density_factor = (1 - ratio) ** 0.5
-                    if random.random() < self.compute_fitness(vector, x, y) * density_factor:
-                        child = reproduce_vector(vector)
-                        offspring.append((nx, ny, child))
-        return offspring
-
-    def place_offspring(self, offspring):
-        for x, y, child in offspring:
-            cell = self.grid[y][x]
-            if len(cell) < self.max_density:
-                cell.append(child)
-                self.active_cells.add((x, y))
-                if False: print(child)
-
-    def mortality(self):
-        to_remove = []
-        for x, y in list(self.active_cells):
-            cell = self.grid[y][x]
-            survivors = []
-            for vector in cell:
-                if random.random() > BASE_DEATH_RATE:
-                    survivors.append(vector)
-            self.grid[y][x] = survivors
-            if not survivors:
-                to_remove.append((x, y))
-        for coord in to_remove:
-            self.active_cells.remove(coord)
-
-    def step(self):
-        self.mortality()
-        offspring = self.reproduce()
-        self.place_offspring(offspring)
-
-if __name__ == '__main__':
+def init_pygame():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     clock = pygame.time.Clock()
+    font = pygame.font.SysFont(None, 24)
+    return screen, clock, font
+
+def setup_environment():
     env = Environment(GRID_WIDTH, GRID_HEIGHT, MAX_DENSITY)
     for _ in range(100):
         x = random.randrange(GRID_WIDTH)
         y = random.randrange(GRID_HEIGHT)
         vector = [random.uniform(0, 255) for _ in range(3)]
         env.add(x, y, vector)
+    return env
+
+def handle_events(paused):
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            return False, paused
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+            paused = not paused
+    return True, paused
+
+def pick_vectors(env):
+    mx, my = pygame.mouse.get_pos()
+    if mx < GRID_WIDTH * CELL_SIZE:
+        x = mx // CELL_SIZE
+        y = my // CELL_SIZE
+        if 0 <= x < GRID_WIDTH and 0 <= y < GRID_HEIGHT:
+            return env.grid[y][x][:MAX_DENSITY]
+    return []
+
+def render_grid(screen, env):
+    for x, y in env.active_cells:
+        cx = x * CELL_SIZE + CELL_SIZE // 2
+        cy = y * CELL_SIZE + CELL_SIZE // 2
+        for vector in env.grid[y][x]:
+            color = (int(vector[0]), int(vector[1]), int(vector[2]))
+            pygame.draw.circle(screen, color, (cx, cy), CELL_SIZE // 3)
+
+def render_panel(screen, selected_vectors, font):
+    panel_x = GRID_WIDTH * CELL_SIZE
+    pygame.draw.rect(screen, (0, 0, 0), (panel_x, 0, SIDE, HEIGHT))
+    for i, vector in enumerate(selected_vectors):
+        color = (int(vector[0]), int(vector[1]), int(vector[2]))
+        y_pos = 10 + i * 30
+        pygame.draw.rect(screen, color, (panel_x + 10, y_pos, 20, 20))
+        txt = font.render(f"{color}", True, (255, 255, 255))
+        screen.blit(txt, (panel_x + 40, y_pos))
+
+def run_simulation():
+    screen, clock, font = init_pygame()
+    env = setup_environment()
     running = True
     paused = False
     while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    paused = not paused
+        running, paused = handle_events(paused)
+        selected_vectors = pick_vectors(env)
         if not paused:
             env.step()
-        screen.fill((0,0,0))
-        for x, y in env.active_cells:
-            for vector in env.grid[y][x]:
-                vx, vy, vz = vector
-                r = int(vx)
-                g = int(vy)
-                b = int(vz)
-                px = x * CELL_SIZE + CELL_SIZE // 2
-                py = y * CELL_SIZE + CELL_SIZE // 2
-                pygame.draw.circle(screen, (r, g, b), (px, py), CELL_SIZE // 3)
+        screen.fill((0, 0, 0))
+        render_grid(screen, env)
+        render_panel(screen, selected_vectors, font)
         pygame.display.flip()
-        clock.tick(200)
+        clock.tick(SPEED)
+
+if __name__ == '__main__':
+    run_simulation()
 
