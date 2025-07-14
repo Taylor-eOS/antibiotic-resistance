@@ -24,6 +24,18 @@ class Environment:
         self.max_density = max_density
         self.grid = [[[] for _ in range(w)] for _ in range(h)]
         self.active_cells = set()
+        self.targets = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255), (255, 0, 255), (255, 255, 0)]
+        segment_count = len(self.targets)
+        self.segment = [
+            [x * segment_count // w for x in range(w)]
+            for _ in range(h)]
+
+    def compute_fitness(self, vector, x, y):
+        r, g, b = vector
+        tr, tg, tb = self.targets[self.segment[y][x]]
+        distance = abs(r - tr) + abs(g - tg) + abs(b - tb)
+        influence = max(0, 1 - distance / 765)
+        return min(1, BASE_REPRO_PROB + 0.3 * influence)
 
     def add(self, x, y, vector):
         self.grid[y][x].append(vector)
@@ -31,13 +43,6 @@ class Environment:
 
     def density(self, x, y):
         return len(self.grid[y][x])
-
-    def compute_fitness(self, vector, x, y):
-        r, g, b = vector
-        targets = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (0, 255, 255), (255, 0, 255), (255, 255, 0)]
-        distances = [abs(r - tr) + abs(g - tg) + abs(b - tb) for tr, tg, tb in targets]
-        influence = max(0, 1 - min(distances) / 765)
-        return min(1, BASE_REPRO_PROB + 0.3 * influence)
 
     def random_adjacent(self, x, y):
         neighbors = []
