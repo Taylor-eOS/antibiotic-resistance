@@ -1,7 +1,7 @@
 import pygame
 import random
 from environment import Environment
-from settings import SIDE, WIDTH, HEIGHT, GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, MAX_DENSITY, SPEED, SPAWNS
+from settings import SIDE, WIDTH, HEIGHT, GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, RADIUS_FACTOR, MAX_DENSITY, SPEED, SPAWNS
 
 def init_pygame():
     pygame.init()
@@ -11,10 +11,20 @@ def init_pygame():
     return screen, clock, font
 
 def setup_environment():
-    env = Environment(GRID_WIDTH, GRID_HEIGHT, MAX_DENSITY)
+    env = Environment(
+        GRID_WIDTH,
+        GRID_HEIGHT,
+        MAX_DENSITY,
+        segment_count=10,
+        west_color=(0, 0, 255),
+        east_color=(255, 0, 0),)
+    spawn_coords = [
+        (x, y)
+        for y in range(GRID_HEIGHT)
+        for x in range(GRID_WIDTH)
+        if env.segment[y][x] == 0]
     for _ in range(SPAWNS):
-        x = random.randrange(GRID_WIDTH)
-        y = random.randrange(GRID_HEIGHT)
+        x, y = random.choice(spawn_coords)
         vector = [random.uniform(0, 255) for _ in range(3)]
         env.add(x, y, vector)
     return env
@@ -42,7 +52,7 @@ def render_grid(screen, env):
         cy = y * CELL_SIZE + CELL_SIZE // 2
         for vector in env.grid[y][x]:
             color = (int(vector[0]), int(vector[1]), int(vector[2]))
-            pygame.draw.circle(screen, color, (cx, cy), CELL_SIZE // 3)
+            pygame.draw.circle(screen, color, (cx, cy), CELL_SIZE // RADIUS_FACTOR)
 
 def render_panel(screen, selected_vectors, font):
     panel_x = GRID_WIDTH * CELL_SIZE
